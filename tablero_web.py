@@ -91,8 +91,9 @@ def get_devices_status_api():
     
     # Simulación de datos para el ejemplo
     # En tu versión real, aquí procesarías la respuesta de la API para determinar el 'engine_status'
+    # Por ejemplo, si la velocidad es > 0, engine_status podría ser 'en_uso'
     all_devices_from_api = {
-        "Freightliner": {"id": "472", "online": "online", "speed": 0, "lat": 25.6866, "lng": -100.3161, "engine_status": "desbloqueado"} 
+        "Freightliner": {"id": "472", "online": "online", "speed": 0, "lat": 25.6866, "lng": -100.3161, "engine_status": "bloqueado"} 
     }
     devices_to_display = {"Freightliner": all_devices_from_api.get("Freightliner")}
     return jsonify(devices_to_display)
@@ -164,15 +165,13 @@ HTML_TEMPLATE = """
         </header>
         <main id="device-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></main>
     </div>
-
     <footer class="text-center p-4 mt-8">
         <p class="text-sm text-gray-500">Desarrollado por Gerardo De La Torre</p>
     </footer>
-
     <script>
     function showOnMap(lat, lng) {
         if (lat && lng && lat !== 'None' && lng !== 'None') {
-            const url = `https://maps.google.com/?q=${lat},${lng}`;
+            const url = `http://googleusercontent.com/maps.google.com/2{lat},${lng}`;
             window.open(url, '_blank');
         } else {
             alert('Ubicación no disponible para este vehículo.');
@@ -201,9 +200,7 @@ HTML_TEMPLATE = """
         } catch (err) {
             statusDiv.innerHTML = '<span class="text-red-400">Error de Conexión.</span>';
         } finally {
-            setTimeout(() => {
-                statusDiv.innerHTML = '';
-            }, 4000);
+            setTimeout(() => { statusDiv.innerHTML = ''; }, 4000);
         }
     }
 
@@ -215,16 +212,58 @@ HTML_TEMPLATE = """
             grid.innerHTML = '';
             for (const deviceName in data) {
                 const device = data[deviceName];
+                
+                // --- LÓGICA PARA TODOS LOS INDICADORES Y BOTONES ---
+
+                // 1. Botón Inteligente de Encendido/Apagado
                 let toggleButtonHTML = '';
+                let lockStatusText = '';
+                let lockStatusColor = '';
+
                 if (device.engine_status === 'bloqueado') {
                     toggleButtonHTML = `<button onclick="sendCommand('${device.id}', 'resume', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg">Encender Motor</button>`;
+                    lockStatusText = 'Motor Bloqueado';
+                    lockStatusColor = 'bg-red-600';
                 } else {
                     toggleButtonHTML = `<button onclick="sendCommand('${device.id}', 'stop', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">Apagar Motor</button>`;
+                    lockStatusText = 'Motor Desbloqueado';
+                    lockStatusColor = 'bg-cyan-600';
                 }
 
+                // 2. Indicador de Movimiento
+                let motionStatusText = '';
+                let motionStatusColor = '';
+                if (device.speed > 0) {
+                    motionStatusText = 'En Movimiento';
+                    motionStatusColor = 'bg-green-600';
+                } else {
+                    motionStatusText = 'Parado';
+                    motionStatusColor = 'bg-gray-500';
+                }
+                
+                // --- CONSTRUCCIÓN DE LA TARJETA HTML ---
                 const card = `
                     <div class="device-card bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
-                        <h2 class="text-xl font-bold text-white">${deviceName}</h2>
+                        <div class="flex justify-between items-start">
+                            <h2 class="text-xl font-bold text-white">${deviceName}</h2>
+                            <span class="text-xs text-gray-400">ID: ${device.id}</span>
+                        </div>
+                        
+                        <div class="space-y-3 my-4">
+                            <div class="flex justify-center items-center p-2 rounded-lg ${lockStatusColor}">
+                                <span class="font-semibold text-sm">${lockStatusText}</span>
+                            </div>
+                            <div class="flex justify-center items-center p-2 rounded-lg ${motionStatusColor}">
+                                <span class="font-semibold text-sm">${motionStatusText}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center text-lg my-4">
+                            <svg class="w-6 h-6 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            <span class="font-semibold">${device.speed}</span>
+                            <span class="text-sm text-gray-400 ml-1">km/h</span>
+                        </div>
+                        
                         <div class="mt-6 space-y-3">
                             <button onclick="showOnMap(${device.lat}, ${device.lng})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg">Ver en Mapa</button>
                             ${toggleButtonHTML}
