@@ -19,7 +19,6 @@ TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
 # --- LISTA DE VEHÍCULOS ---
-# Contiene ambos dispositivos para que el sistema los conozca, aunque solo se muestre uno.
 VEHICULOS = {
     "Freightliner":    {"id": "472", "imei": "863719069189398"},
     "Toma de Fuerza1": {"id": "128", "imei": "807397674"}
@@ -49,7 +48,7 @@ def send_telegram_notification(message):
     except Exception as e:
         print(f"Error al enviar notificación de Telegram: {e}")
 
-# --- RUTAS DE AUTENTICACIÓN ---
+# --- RUTAS DE AUTENTicación ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'username' in session:
@@ -88,21 +87,14 @@ def get_devices_status_api():
         return jsonify({"error": "No autorizado"}), 401
     
     # Esta función ahora solo devolverá el estado del Freightliner al frontend
-    # aunque consulte el estado de todos los dispositivos.
+    # ... (Aquí va tu lógica completa para obtener el estado real de la API) ...
     
-    # ... (Aquí va tu lógica completa para obtener el estado de todos los vehículos) ...
-    
-    # Simulación de datos de la API para el ejemplo
-    # En tu versión real, aquí procesarías la respuesta de la API
+    # Simulación de datos para el ejemplo
+    # En tu versión real, aquí procesarías la respuesta de la API para determinar el 'engine_status'
     all_devices_from_api = {
-        "Freightliner": {"id": "472", "online": "online", "speed": 0, "lat": 25.6866, "lng": -100.3161, "engine_status": "desbloqueado"}
+        "Freightliner": {"id": "472", "online": "online", "speed": 0, "lat": 25.6866, "lng": -100.3161, "engine_status": "desbloqueado"} 
     }
-    
-    # Filtramos para enviar solo el Freightliner al frontend
-    devices_to_display = {
-        "Freightliner": all_devices_from_api.get("Freightliner")
-    }
-
+    devices_to_display = {"Freightliner": all_devices_from_api.get("Freightliner")}
     return jsonify(devices_to_display)
 
 @app.route('/api/send_command', methods=['POST'])
@@ -115,20 +107,12 @@ def send_command_api():
     data = request.get_json()
     command_type = data.get('type')
     
-    # --- LÓGICA DE COMANDOS ACTUALIZADA ---
-    
-    # Regla especial para la Toma de Fuerza
     if command_type == 'pto_off':
         target_device_info = VEHICULOS.get("Toma de Fuerza1")
         target_device_id = target_device_info['id']
-        
-        # --- ¡¡¡NECESITO EL COMANDO REAL PARA ESTE DISPOSITIVO!!! ---
-        command_message = "  setdigout 1" # <-- EJEMPLO. USA TU COMANDO REAL
-    
-    # Reglas normales para los otros botones
+        command_message = "  setdigout 1" # <-- EJEMPLO, USA TU COMANDO REAL PARA PTO
     else:
         target_device_id = data.get('device_id')
-        
         if command_type == 'stop':
             command_message = '  setdigout 1'
         elif command_type == 'resume':
@@ -136,14 +120,8 @@ def send_command_api():
         else:
             return jsonify({"status": 0, "message": "Tipo de comando no válido."}), 400
 
-    # --- Envío del comando a la API ---
     url = f"{API_BASE_URL}{COMMAND_ENDPOINT}"
-    payload = {
-        'user_api_hash': USER_API_HASH, 
-        'device_id': target_device_id,
-        'type': 'custom',
-        'data': command_message
-    }
+    payload = {'user_api_hash': USER_API_HASH, 'device_id': target_device_id, 'type': 'custom', 'data': command_message}
     try:
         response = requests.post(url, json=payload, timeout=15)
         response.raise_for_status()
@@ -186,9 +164,83 @@ HTML_TEMPLATE = """
         </header>
         <main id="device-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></main>
     </div>
+
+    <footer class="text-center p-4 mt-8">
+        <p class="text-sm text-gray-500">Desarrollado por Gerardo De La Torre</p>
+    </footer>
+
     <script>
-        // Tu JavaScript para crear las tarjetas va aquí.
-        // El HTML de la tarjeta debe incluir los tres botones con sus respectivas llamadas a `sendCommand`.
+    function showOnMap(lat, lng) {
+        if (lat && lng && lat !== 'None' && lng !== 'None') {
+            const url = `https://maps.google.com/?q=${lat},${lng}`;
+            window.open(url, '_blank');
+        } else {
+            alert('Ubicación no disponible para este vehículo.');
+        }
+    }
+
+    async function sendCommand(deviceId, commandType, buttonElement) {
+        const statusDiv = document.getElementById(`status-${deviceId}`);
+        statusDiv.innerHTML = '<span class="text-blue-400">Enviando...</span>';
+        const parentCard = buttonElement.closest('.device-card');
+        const buttons = parentCard.querySelectorAll('button');
+        buttons.forEach(b => b.disabled = true);
+        try {
+            const response = await fetch('/api/send_command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: deviceId, type: commandType })
+            });
+            const result = await response.json();
+            if (response.ok && (result.status === 1 || response.status === 200) ) {
+                statusDiv.innerHTML = '<span class="text-green-400">¡Comando enviado!</span>';
+                setTimeout(fetchDevices, 2000); 
+            } else {
+                statusDiv.innerHTML = `<span class="text-red-400">Error: ${result.message || 'Fallo inesperado.'}</span>`;
+            }
+        } catch (err) {
+            statusDiv.innerHTML = '<span class="text-red-400">Error de Conexión.</span>';
+        } finally {
+            setTimeout(() => {
+                statusDiv.innerHTML = '';
+            }, 4000);
+        }
+    }
+
+    async function fetchDevices() {
+        const grid = document.getElementById('device-grid');
+        try {
+            const response = await fetch('/api/get_devices_status');
+            const data = await response.json();
+            grid.innerHTML = '';
+            for (const deviceName in data) {
+                const device = data[deviceName];
+                let toggleButtonHTML = '';
+                if (device.engine_status === 'bloqueado') {
+                    toggleButtonHTML = `<button onclick="sendCommand('${device.id}', 'resume', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg">Encender Motor</button>`;
+                } else {
+                    toggleButtonHTML = `<button onclick="sendCommand('${device.id}', 'stop', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">Apagar Motor</button>`;
+                }
+
+                const card = `
+                    <div class="device-card bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
+                        <h2 class="text-xl font-bold text-white">${deviceName}</h2>
+                        <div class="mt-6 space-y-3">
+                            <button onclick="showOnMap(${device.lat}, ${device.lng})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg">Ver en Mapa</button>
+                            ${toggleButtonHTML}
+                            <button onclick="sendCommand('${device.id}', 'pto_off', this)" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-lg">Apagar Toma de Fuerza</button>
+                        </div>
+                        <div id="status-${device.id}" class="text-center text-xs mt-3 h-4"></div>
+                    </div>
+                `;
+                grid.innerHTML += card;
+            }
+        } catch (err) {
+            console.error("Error fetching devices:", err);
+            grid.innerHTML = '<p class="text-red-400">Error al cargar el vehículo.</p>';
+        }
+    }
+    document.addEventListener('DOMContentLoaded', fetchDevices);
     </script>
 </body></html>
 """
