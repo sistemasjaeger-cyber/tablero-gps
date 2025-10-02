@@ -32,7 +32,49 @@ USERS = {
     "cliente": { "password_hash": generate_password_hash("cliente123"), "role": "cliente" }
 }
 
-# ... (El resto del código Python, como las funciones de Telegram y login, va aquí sin cambios) ...
+# --- FUNCIÓN DE TELEGRAM ---
+def send_telegram_notification(message):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("Advertencia: Variables de Telegram no configuradas.")
+        return
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': message, 'parse_mode': 'HTML'}
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        print(f"Error al enviar notificación de Telegram: {e}")
+
+# --- RUTAS DE AUTENTICACIÓN ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if 'username' in session:
+        return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user_data = USERS.get(username)
+        if user_data and check_password_hash(user_data['password_hash'], password):
+            session['username'] = username
+            session['role'] = user_data['role']
+            ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+            message = f"✅ <b>Inicio de sesión exitoso</b>\n\n👤 <b>Usuario:</b> {username}\n📦 <b>Rol:</b> {user_data['role']}\n🌐 <b>IP:</b> {ip_address}"
+            send_telegram_notification(message)
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Usuario o contraseña incorrectos.', 'danger')
+    return render_template_string(LOGIN_TEMPLATE)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+# --- RUTA PRINCIPAL DEL TABLERO ---
+@app.route('/')
+def dashboard():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template_string(HTML_TEMPLATE, username=session.get('username'))
 
 # --- RUTAS DE LA API ---
 @app.route('/api/get_devices_status')
@@ -44,8 +86,8 @@ def get_devices_status_api():
     devices_to_display = {
         "Freightliner": {"id": "472", "online": "online", "speed": 0, "lat": 25.68, "lng": -100.31, "engine_status": "desbloqueado"},
         "Prueba":       {"id": "475", "online": "online", "speed": 0, "lat": 19.43, "lng": -99.13, 
-                         "unit_status": "desbloqueado", # Estado de la unidad
-                         "fifth_wheel_status": "bloqueado"  # Estado de la 5ta rueda
+                         "unit_status": "desbloqueado", # 'bloqueado' o 'desbloqueado'
+                         "fifth_wheel_status": "bloqueado"  # 'bloqueado' o 'desbloqueado'
                         }
     }
     return jsonify(devices_to_display)
@@ -61,7 +103,6 @@ def send_command_api():
     target_device = None
     command_message = None
 
-    # Comandos para Freightliner
     if command_type in ['stop', 'resume']:
         device_id = data.get('device_id')
         target_device = next((v for v in VEHICULOS.values() if v['id'] == device_id), None)
@@ -69,16 +110,11 @@ def send_command_api():
     elif command_type == 'pto_off':
         target_device = VEHICULOS.get("Toma de Fuerza1")
         command_message = f'ST300CMD;{target_device["imei"]};02;Disable2'
-
-    # Comandos para "Prueba"
     elif command_type in ['block_unit', 'unblock_unit']:
         target_device = VEHICULOS.get("Prueba_Unidad")
-        # --- ¡¡¡NECESITO LOS COMANDOS REALES!!! ---
         command_message = "COMANDO_PARA_BLOQUEAR_UNIDAD" if command_type == 'block_unit' else "COMANDO_PARA_DESBLOQUEAR_UNIDAD"
-    
     elif command_type in ['block_fifth_wheel', 'unblock_fifth_wheel']:
         target_device = VEHICULOS.get("Prueba_QuintaR")
-        # --- ¡¡¡NECESITO LOS COMANDOS REALES!!! ---
         command_message = "COMANDO_PARA_BLOQUEAR_5RUEDA" if command_type == 'block_fifth_wheel' else "COMANDO_PARA_DESBLOQUEAR_5RUEDA"
     else:
         return jsonify({"status": 0, "message": "Tipo de comando no válido."}), 400
@@ -94,11 +130,79 @@ def send_command_api():
     except Exception as e:
         return jsonify({"status": 0, "message": f"Error al enviar comando: {e}"}), 500
 
-# --- PLANTILLA HTML (JAVASCRIPT ACTUALIZADO) ---
+# --- PLANTILLAS HTML ---
+LOGIN_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>Iniciar Sesión</title><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-gray-900 flex items-center justify-center h-screen">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-sm">
+        <h2 class="text-2xl font-bold text-center text-white mb-6">Acceso al Tablero</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+            <div class="bg-red-500 text-white p-3 rounded mb-4">{{ message }}</div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+        <form method="POST">
+            <div class="mb-4"><label for="username" class="block text-gray-300 mb-2">Usuario</label><input type="text" name="username" class="w-full bg-gray-700 border border-gray-600 p-2 rounded text-white focus:outline-none focus:border-indigo-500" required></div>
+            <div class="mb-6"><label for="password" class="block text-gray-300 mb-2">Contraseña</label><input type="password" name="password" class="w-full bg-gray-700 border border-gray-600 p-2 rounded text-white focus:outline-none focus:border-indigo-500" required></div>
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">Entrar</button>
+        </form>
+    </div>
+</body></html>
+"""
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<script>
-    // ... (Tus funciones showOnMap y sendCommand van aquí sin cambios) ...
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tablero de Control GPS</title><script src="https://cdn.tailwindcss.com"></script><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Inter',sans-serif}</style></head>
+<body class="bg-gray-900 text-white">
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-12">
+             <div class="flex justify-between items-center">
+                <span></span><h1 class="text-4xl md:text-5xl font-bold text-indigo-400">Tablero de Control de Flota</h1>
+                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">Cerrar Sesión</a>
+            </div>
+            <p class="text-gray-400 mt-2">Bienvenido, <strong>{{ username }}</strong>.</p>
+        </header>
+        <main id="device-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></main>
+    </div>
+    <footer class="text-center p-4 mt-8">
+        <p class="text-sm text-gray-500">Desarrollado por Gerardo De La Torre</p>
+    </footer>
+    <script>
+    function showOnMap(lat, lng) {
+        if (lat && lng && lat !== 'None' && lng !== 'None') {
+            const url = `http://googleusercontent.com/maps/place/${lat},${lng}`;
+            window.open(url, '_blank');
+        } else {
+            alert('Ubicación no disponible para este vehículo.');
+        }
+    }
+
+    async function sendCommand(deviceId, commandType, buttonElement) {
+        const statusDiv = document.getElementById(`status-${deviceId}`);
+        statusDiv.innerHTML = '<span class="text-blue-400">Enviando...</span>';
+        const parentCard = buttonElement.closest('.device-card');
+        const buttons = parentCard.querySelectorAll('button');
+        buttons.forEach(b => b.disabled = true);
+        try {
+            const response = await fetch('/api/send_command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: deviceId, type: commandType })
+            });
+            const result = await response.json();
+            if (response.ok && (result.status === 1 || response.status === 200) ) {
+                statusDiv.innerHTML = '<span class="text-green-400">¡Comando enviado!</span>';
+                setTimeout(fetchDevices, 2000); 
+            } else {
+                statusDiv.innerHTML = `<span class="text-red-400">Error: ${result.message || 'Fallo inesperado.'}</span>`;
+            }
+        } catch (err) {
+            statusDiv.innerHTML = '<span class="text-red-400">Error de Conexión.</span>';
+        } finally {
+            setTimeout(() => { statusDiv.innerHTML = ''; }, 4000);
+        }
+    }
 
     async function fetchDevices() {
         const grid = document.getElementById('device-grid');
