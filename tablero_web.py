@@ -76,26 +76,7 @@ def dashboard():
         return redirect(url_for('login'))
     return render_template_string(HTML_TEMPLATE, username=session.get('username'))
 
-# --- RUTAS DE LA API ---
-@app.route('/api/get_devices_status')
-def get_devices_status_api():
-    if 'username' not in session:
-        return jsonify({"error": "No autorizado"}), 401
-    
-    # MODO DIAGNÓSTICO: Solo mostramos la unidad "Prueba"
-    devices_to_display = {
-        "Prueba": {
-            "id": "475", # ID principal de la unidad para el frontend
-            "online": "online", 
-            "speed": 0, 
-            "lat": 19.43, 
-            "lng": -99.13, 
-            "unit_status": "desbloqueado",
-            "fifth_wheel_status": "bloqueado"
-        }
-    }
-    return jsonify(devices_to_display)
-
+# --- RUTA DE LA API PARA ENVIAR COMANDOS ---
 @app.route('/api/send_command', methods=['POST'])
 def send_command_api():
     if 'username' not in session: return jsonify({"status": 0, "message": "No autorizado"}), 401
@@ -107,8 +88,10 @@ def send_command_api():
     target_device = None
     command_message = None
 
-    # Lógica de comandos solo para la unidad de Prueba
-    if command_type in ['block_unit', 'unblock_unit']:
+    if command_type in ['stop', 'resume']:
+        target_device = VEHICULOS.get("Freightliner")
+        command_message = '  setdigout 1' if command_type == 'stop' else '  setdigout 0'
+    elif command_type in ['block_unit', 'unblock_unit']:
         target_device = VEHICULOS.get("Prueba_Unidad")
         command_message = '  setdigout 1' if command_type == 'block_unit' else '  setdigout 0'
     elif command_type in ['block_fifth_wheel', 'unblock_fifth_wheel']:
@@ -116,14 +99,13 @@ def send_command_api():
         imei = target_device['imei']
         command_message = f'ST300CMD;{imei};02;Disable1' if command_type == 'block_fifth_wheel' else f'ST300CMD;{imei};02;Enable1'
     else:
-        return jsonify({"status": 0, "message": "Comando no relevante para diagnóstico."}), 400
+        return jsonify({"status": 0, "message": "Tipo de comando no válido."}), 400
 
     if not target_device: return jsonify({"status": 0, "message": "Dispositivo objetivo no encontrado."}), 404
 
     url = f"{API_BASE_URL}{COMMAND_ENDPOINT}"
     payload = {'user_api_hash': USER_API_HASH, 'device_id': target_device['id'], 'type': 'custom', 'data': command_message}
     
-    # --- MODO DIAGNÓSTICO: Imprimir información en los Logs ---
     print("--- ENVIANDO COMANDO ---")
     print(f"Payload: {payload}")
     
@@ -146,11 +128,6 @@ LOGIN_TEMPLATE = """
 <body class="bg-gray-900 flex items-center justify-center h-screen">
     <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-sm">
         <h2 class="text-2xl font-bold text-center text-white mb-6">Acceso al Tablero</h2>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}{% for category, message in messages %}
-            <div class="bg-red-500 text-white p-3 rounded mb-4">{{ message }}</div>
-            {% endfor %}{% endif %}
-        {% endwith %}
         <form method="POST">
             <div class="mb-4"><label for="username" class="block text-gray-300 mb-2">Usuario</label><input type="text" name="username" class="w-full bg-gray-700 border border-gray-600 p-2 rounded text-white focus:outline-none focus:border-indigo-500" required></div>
             <div class="mb-6"><label for="password" class="block text-gray-300 mb-2">Contraseña</label><input type="password" name="password" class="w-full bg-gray-700 border border-gray-600 p-2 rounded text-white focus:outline-none focus:border-indigo-500" required></div>
@@ -162,101 +139,75 @@ LOGIN_TEMPLATE = """
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tablero de Control GPS</title><script src="https://cdn.tailwindcss.com"></script><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Inter',sans-serif}</style></head>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tablero de Diagnóstico GPS</title><script src="https://cdn.tailwindcss.com"></script><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Inter',sans-serif}</style></head>
 <body class="bg-gray-900 text-white">
     <div class="container mx-auto p-4 md:p-8">
         <header class="text-center mb-12">
              <div class="flex justify-between items-center">
-                <span></span><h1 class="text-4xl md:text-5xl font-bold text-indigo-400">Diagnóstico: Unidad de Prueba</h1>
+                <span></span><h1 class="text-4xl md:text-5xl font-bold text-indigo-400">Panel de Diagnóstico</h1>
                 <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">Cerrar Sesión</a>
             </div>
             <p class="text-gray-400 mt-2">Bienvenido, <strong>{{ username }}</strong>.</p>
         </header>
-        <main id="device-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></main>
+        
+        <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-2xl font-bold text-red-400 mb-4">BLOQUEAR UNIDADES</h2>
+                <div class="space-y-3">
+                    <button onclick="sendCommand('472', 'stop', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg">Bloquear Motor (Freightliner)</button>
+                    <button onclick="sendCommand('475', 'block_unit', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg">Bloquear Unidad (Prueba)</button>
+                    <button onclick="sendCommand('362', 'block_fifth_wheel', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg">Bloquear 5ta Rueda (Prueba)</button>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-2xl font-bold text-green-400 mb-4">DESBLOQUEAR UNIDADES</h2>
+                <div class="space-y-3">
+                    <button onclick="sendCommand('472', 'resume', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg">Desbloquear Motor (Freightliner)</button>
+                    <button onclick="sendCommand('475', 'unblock_unit', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg">Desbloquear Unidad (Prueba)</button>
+                    <button onclick="sendCommand('362', 'unblock_fifth_wheel', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg">Desbloquear 5ta Rueda (Prueba)</button>
+                </div>
+            </div>
+
+        </main>
+
+        <div id="status-message" class="mt-8 text-center text-lg h-6"></div>
+
     </div>
     <footer class="text-center p-4 mt-8">
         <p class="text-sm text-gray-500">Desarrollado por Gerardo De La Torre</p>
     </footer>
     <script>
-    function showOnMap(lat, lng) {
-        if (lat && lng && lat !== 'None' && lng !== 'None') {
-            const url = `http://googleusercontent.com/maps/place/${lat},${lng}`;
-            window.open(url, '_blank');
-        } else {
-            alert('Ubicación no disponible para este vehículo.');
-        }
-    }
-
     async function sendCommand(deviceId, commandType, buttonElement) {
-        const statusDiv = document.getElementById(`status-${deviceId}`);
-        statusDiv.innerHTML = '<span class="text-blue-400">Enviando...</span>';
-        const parentCard = buttonElement.closest('.device-card');
-        const buttons = parentCard.querySelectorAll('button');
-        buttons.forEach(b => b.disabled = true);
+        const statusDiv = document.getElementById('status-message');
+        statusDiv.innerHTML = '<span class="text-blue-400">Enviando comando...</span>';
+        
+        // Deshabilitar todos los botones para evitar envíos múltiples
+        document.querySelectorAll('button').forEach(b => b.disabled = true);
+
         try {
             const response = await fetch('/api/send_command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ device_id: deviceId, type: commandType })
+                body: JSON.stringify({ device_id: deviceId, type: commandType }) // deviceId no se usa en todos los casos, pero lo enviamos por consistencia
             });
             const result = await response.json();
             if (response.ok && (result.status === 1 || response.status === 200) ) {
-                statusDiv.innerHTML = '<span class="text-green-400">¡Comando enviado! Revisa los logs.</span>';
-                // No recargamos para poder ver el resultado del log y presionar otros botones
+                statusDiv.innerHTML = '<span class="text-green-400">¡Éxito! Revisa los logs y el vehículo.</span>';
             } else {
                 statusDiv.innerHTML = `<span class="text-red-400">Error: ${result.message || 'Fallo inesperado.'} Revisa los logs.</span>`;
             }
         } catch (err) {
             statusDiv.innerHTML = '<span class="text-red-400">Error de Conexión. Revisa los logs.</span>';
         } finally {
+            // Habilitar todos los botones después de un tiempo
             setTimeout(() => { 
-                buttons.forEach(b => b.disabled = false);
-                statusDiv.innerHTML = 'Listo para nuevo comando. Revisa los logs para ver el resultado anterior.';
+                document.querySelectorAll('button').forEach(b => b.disabled = false);
+                statusDiv.innerHTML = 'Listo para la siguiente prueba.';
              }, 4000);
         }
     }
-
-    async function fetchDevices() {
-        const grid = document.getElementById('device-grid');
-        try {
-            const response = await fetch('/api/get_devices_status');
-            const data = await response.json();
-            grid.innerHTML = '';
-
-            for (const deviceName in data) {
-                const device = data[deviceName];
-                let buttonsHTML = '';
-
-                if (deviceName === 'Prueba') {
-                    const unitToggleButton = device.unit_status === 'bloqueado' ?
-                        `<button onclick="sendCommand('${device.id}', 'unblock_unit', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg">Desbloquear Unidad</button>` :
-                        `<button onclick="sendCommand('${device.id}', 'block_unit', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">Bloquear Unidad</button>`;
-                    
-                    const fifthWheelToggleButton = device.fifth_wheel_status === 'bloqueado' ?
-                        `<button onclick="sendCommand('${device.id}', 'unblock_fifth_wheel', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg">Desbloquear 5ta Rueda</button>` :
-                        `<button onclick="sendCommand('${device.id}', 'block_fifth_wheel', this)" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-lg">Bloquear 5ta Rueda</button>`;
-                    
-                    buttonsHTML = `${unitToggleButton}${fifthWheelToggleButton}`;
-                }
-                
-                const card = `
-                    <div class="device-card bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
-                        <h2 class="text-xl font-bold text-white">${deviceName}</h2>
-                        <div class="mt-6 space-y-3">
-                            <button onclick="showOnMap(${device.lat}, ${device.lng})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg">Ver en Mapa</button>
-                            ${buttonsHTML}
-                        </div>
-                        <div id="status-${device.id}" class="text-center text-xs mt-3 h-4"></div>
-                    </div>
-                `;
-                grid.innerHTML += card;
-            }
-        } catch (err) {
-            console.error("Error fetching devices:", err);
-            grid.innerHTML = '<p class="text-red-400">Error al cargar los vehículos.</p>';
-        }
-    }
-    document.addEventListener('DOMContentLoaded', fetchDevices);
     </script>
 </body></html>
 """
