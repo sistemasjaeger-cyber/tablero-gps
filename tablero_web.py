@@ -1,4 +1,5 @@
-import requests
+
+      import requests
 import json
 from flask import Flask, jsonify, render_template_string, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -37,7 +38,7 @@ def send_telegram_notification(message):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("Advertencia: Variables de Telegram no configuradas.")
         return
-    url = f"https.api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': message, 'parse_mode': 'HTML'}
     try:
         requests.post(url, json=payload, timeout=5)
@@ -127,6 +128,7 @@ LOGIN_TEMPLATE = """
 <html lang="es"><head><meta charset="UTF-8"><title>Iniciar Sesión</title><script src="https://cdn.tailwindcss.com"></script></head>
 <body class="bg-gray-900 flex items-center justify-center h-screen">
     <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-sm">
+        <img src="https://images.squarespace-cdn.com/content/v1/65ce3e002dabd5230450e8fa/73b67494-08e4-4123-9494-90f18a87aaf6/Jaeger+Softech+Logo+Horizonal+Layout+Adjusted.png?format=1500w" alt="Logo" class="mx-auto h-10 mb-6">
         <h2 class="text-2xl font-bold text-center text-white mb-6">Acceso al Tablero</h2>
         <form method="POST">
             <div class="mb-4"><label for="username" class="block text-gray-300 mb-2">Usuario</label><input type="text" name="username" class="w-full bg-gray-700 border border-gray-600 p-2 rounded text-white focus:outline-none focus:border-indigo-500" required></div>
@@ -142,16 +144,16 @@ HTML_TEMPLATE = """
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tablero de Diagnóstico GPS</title><script src="https://cdn.tailwindcss.com"></script><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Inter',sans-serif}</style></head>
 <body class="bg-gray-900 text-white">
     <div class="container mx-auto p-4 md:p-8">
-        <header class="text-center mb-12">
-             <div class="flex justify-between items-center">
-                <span></span><h1 class="text-4xl md:text-5xl font-bold text-indigo-400">Panel de Diagnóstico</h1>
-                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">Cerrar Sesión</a>
+        <header class="text-center mb-12 relative">
+            <div class="flex justify-center items-center gap-4">
+                <img src="https://images.squarespace-cdn.com/content/v1/65ce3e002dabd5230450e8fa/73b67494-08e4-4123-9494-90f18a87aaf6/Jaeger+Softech+Logo+Horizonal+Layout+Adjusted.png?format=1500w" alt="Logo" class="h-12">
+                <h1 class="text-4xl md:text-5xl font-bold text-indigo-400">Panel de Diagnóstico</h1>
             </div>
-            <p class="text-gray-400 mt-2">Bienvenido, <strong>{{ username }}</strong>.</p>
+            <a href="/logout" class="absolute top-0 right-0 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">Cerrar Sesión</a>
+            <p class="text-gray-400 mt-4">Bienvenido, <strong>{{ username }}</strong>.</p>
         </header>
         
         <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            
             <div class="bg-gray-800 p-6 rounded-lg">
                 <h2 class="text-2xl font-bold text-red-400 mb-4">BLOQUEAR UNIDADES</h2>
                 <div class="space-y-3">
@@ -160,7 +162,6 @@ HTML_TEMPLATE = """
                     <button onclick="sendCommand('362', 'block_fifth_wheel', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg">Bloquear 5ta Rueda (Prueba)</button>
                 </div>
             </div>
-
             <div class="bg-gray-800 p-6 rounded-lg">
                 <h2 class="text-2xl font-bold text-green-400 mb-4">DESBLOQUEAR UNIDADES</h2>
                 <div class="space-y-3">
@@ -169,11 +170,8 @@ HTML_TEMPLATE = """
                     <button onclick="sendCommand('362', 'unblock_fifth_wheel', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg">Desbloquear 5ta Rueda (Prueba)</button>
                 </div>
             </div>
-
         </main>
-
         <div id="status-message" class="mt-8 text-center text-lg h-6"></div>
-
     </div>
     <footer class="text-center p-4 mt-8">
         <p class="text-sm text-gray-500">Desarrollado por Gerardo De La Torre</p>
@@ -182,18 +180,15 @@ HTML_TEMPLATE = """
     async function sendCommand(deviceId, commandType, buttonElement) {
         const statusDiv = document.getElementById('status-message');
         statusDiv.innerHTML = '<span class="text-blue-400">Enviando comando...</span>';
-        
-        // Deshabilitar todos los botones para evitar envíos múltiples
         document.querySelectorAll('button').forEach(b => b.disabled = true);
-
         try {
             const response = await fetch('/api/send_command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ device_id: deviceId, type: commandType }) // deviceId no se usa en todos los casos, pero lo enviamos por consistencia
+                body: JSON.stringify({ device_id: deviceId, type: commandType })
             });
             const result = await response.json();
-            if (response.ok && (result.status === 1 || response.status === 200) ) {
+            if (response.ok && (result.status === 1 || result.status === 200) ) {
                 statusDiv.innerHTML = '<span class="text-green-400">¡Éxito! Revisa los logs y el vehículo.</span>';
             } else {
                 statusDiv.innerHTML = `<span class="text-red-400">Error: ${result.message || 'Fallo inesperado.'} Revisa los logs.</span>`;
@@ -201,7 +196,6 @@ HTML_TEMPLATE = """
         } catch (err) {
             statusDiv.innerHTML = '<span class="text-red-400">Error de Conexión. Revisa los logs.</span>';
         } finally {
-            // Habilitar todos los botones después de un tiempo
             setTimeout(() => { 
                 document.querySelectorAll('button').forEach(b => b.disabled = false);
                 statusDiv.innerHTML = 'Listo para la siguiente prueba.';
