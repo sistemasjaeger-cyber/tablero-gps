@@ -9,9 +9,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'cambia-esta-clave-por-algo-secreto')
 
 # --- CONFIGURACIÓN DE LA API DE GPS ---
-API_BASE_URL = 'http://5.78.94.130'
-USER_API_HASH = os.environ.get('USER_API_HASH')
-COMMAND_ENDPOINT = '/api/send_gprs_command'
+API_BASE_URL = 'http://5.78.94.130' 
+USER_API_HASH = os.environ.get('USER_API_HASH') 
+COMMAND_ENDPOINT = '/api/send_gprs_command' 
 DEVICES_ENDPOINT = '/api/get_devices'
 
 # --- CONFIGURACIÓN DE TELEGRAM ---
@@ -125,13 +125,13 @@ def send_command_api():
 LOGIN_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Iniciar Sesión</title><script src="https://cdn.tailwindcss.com"></script></head>
-<body class="bg-gray-900 flex items-center justify-center h-screen">
-    <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-sm">
+<body class="bg-white text-gray-800 flex items-center justify-center h-screen">
+    <div class="bg-gray-100 p-8 rounded-lg shadow-lg w-full max-w-sm">
         <img src="https://images.squarespace-cdn.com/content/v1/65ce3e002dabd5230450e8fa/73b67494-08e4-4123-9494-90f18a87aaf6/Jaeger+Softech+Logo+Horizonal+Layout+Adjusted.png?format=1500w" alt="Logo" class="mx-auto h-10 mb-6">
-        <h2 class="text-2xl font-bold text-center text-white mb-6">Acceso al Tablero</h2>
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Acceso al Tablero</h2>
         <form method="POST">
-            <div class="mb-4"><label for="username" class="block text-gray-300 mb-2">Usuario</label><input type="text" name="username" class="w-full bg-gray-700 border border-gray-600 p-2 rounded text-white focus:outline-none focus:border-indigo-500" required></div>
-            <div class="mb-6"><label for="password" class="block text-gray-300 mb-2">Contraseña</label><input type="password" name="password" class="w-full bg-gray-700 border border-gray-600 p-2 rounded text-white focus:outline-none focus:border-indigo-500" required></div>
+            <div class="mb-4"><label for="username" class="block text-gray-700 mb-2">Usuario</label><input type="text" name="username" class="w-full bg-white border border-gray-300 p-2 rounded text-gray-900 focus:outline-none focus:border-indigo-500" required></div>
+            <div class="mb-6"><label for="password" class="block text-gray-700 mb-2">Contraseña</label><input type="password" name="password" class="w-full bg-white border border-gray-300 p-2 rounded text-gray-900 focus:outline-none focus:border-indigo-500" required></div>
             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">Entrar</button>
         </form>
     </div>
@@ -141,21 +141,23 @@ LOGIN_TEMPLATE = """
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tablero de Diagnóstico GPS</title><script src="https://cdn.tailwindcss.com"></script><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Inter',sans-serif}</style></head>
-<body class="bg-gray-900 text-white">
+<body class="bg-white text-gray-800">
     <div class="container mx-auto p-4 md:p-8">
-        <header class="text-center mb-12 relative">
-            <div class="flex justify-center items-center gap-4">
+        <header class="mb-12 relative flex items-center justify-between">
+            <div class="flex items-center gap-4">
                 <img src="https://images.squarespace-cdn.com/content/v1/65ce3e002dabd5230450e8fa/73b67494-08e4-4123-9494-90f18a87aaf6/Jaeger+Softech+Logo+Horizonal+Layout+Adjusted.png?format=1500w" alt="Logo" class="h-12">
-                <h1 class="text-4xl md:text-5xl font-bold text-indigo-400">Panel de Diagnóstico</h1>
+                <h1 class="text-3xl md:text-4xl font-bold text-indigo-700">Panel de Diagnóstico</h1>
             </div>
-            <a href="/logout" class="absolute top-0 right-0 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">Cerrar Sesión</a>
-            <p class="text-gray-400 mt-4">Bienvenido, <strong>{{ username }}</strong>.</p>
+            <div class="text-right">
+                <p class="text-gray-600 mb-2">Bienvenido, <strong>{{ username }}</strong>.</p>
+                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">Cerrar Sesión</a>
+            </div>
         </header>
         
         <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
             
-            <div class="bg-gray-800 p-6 rounded-lg">
-                <h2 class="text-2xl font-bold text-red-400 mb-4">BLOQUEAR UNIDADES</h2>
+            <div class="bg-red-50 p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold text-red-700 mb-4">BLOQUEAR UNIDADES</h2>
                 <div class="space-y-3">
                     <button onclick="sendCommand('472', 'stop', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg">Bloquear Motor (Freightliner)</button>
                     <button onclick="sendCommand('475', 'block_unit', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg">Bloquear Unidad (Prueba)</button>
@@ -163,8 +165,8 @@ HTML_TEMPLATE = """
                 </div>
             </div>
 
-            <div class="bg-gray-800 p-6 rounded-lg">
-                <h2 class="text-2xl font-bold text-green-400 mb-4">DESBLOQUEAR UNIDADES</h2>
+            <div class="bg-green-50 p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold text-green-700 mb-4">DESBLOQUEAR UNIDADES</h2>
                 <div class="space-y-3">
                     <button onclick="sendCommand('472', 'resume', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg">Desbloquear Motor (Freightliner)</button>
                     <button onclick="sendCommand('475', 'unblock_unit', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg">Desbloquear Unidad (Prueba)</button>
@@ -174,7 +176,7 @@ HTML_TEMPLATE = """
 
         </main>
 
-        <div id="status-message" class="mt-8 text-center text-lg h-6"></div>
+        <div id="status-message" class="mt-8 text-center text-lg h-6 text-gray-700"></div>
 
     </div>
     <footer class="text-center p-4 mt-8">
@@ -183,7 +185,7 @@ HTML_TEMPLATE = """
     <script>
     async function sendCommand(deviceId, commandType, buttonElement) {
         const statusDiv = document.getElementById('status-message');
-        statusDiv.innerHTML = '<span class="text-blue-400">Enviando comando...</span>';
+        statusDiv.innerHTML = '<span class="text-blue-600">Enviando comando...</span>';
         
         document.querySelectorAll('button').forEach(b => b.disabled = true);
 
@@ -195,12 +197,12 @@ HTML_TEMPLATE = """
             });
             const result = await response.json();
             if (response.ok && (result.status === 1 || result.status === 200) ) {
-                statusDiv.innerHTML = '<span class="text-green-400">¡Éxito! Revisa los logs y el vehículo.</span>';
+                statusDiv.innerHTML = '<span class="text-green-600">¡Éxito! Revisa los logs y el vehículo.</span>';
             } else {
-                statusDiv.innerHTML = `<span class="text-red-400">Error: ${result.message || 'Fallo inesperado.'} Revisa los logs.</span>`;
+                statusDiv.innerHTML = `<span class="text-red-600">Error: ${result.message || 'Fallo inesperado.'} Revisa los logs.</span>`;
             }
         } catch (err) {
-            statusDiv.innerHTML = '<span class="text-red-400">Error de Conexión. Revisa los logs.</span>';
+            statusDiv.innerHTML = '<span class="text-red-600">Error de Conexión. Revisa los logs.</span>';
         } finally {
             setTimeout(() => { 
                 document.querySelectorAll('button').forEach(b => b.disabled = false);
