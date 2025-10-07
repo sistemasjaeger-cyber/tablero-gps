@@ -1,5 +1,4 @@
-
-      import requests
+import requests
 import json
 from flask import Flask, jsonify, render_template_string, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,9 +9,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'cambia-esta-clave-por-algo-secreto')
 
 # --- CONFIGURACIÓN DE LA API DE GPS ---
-API_BASE_URL = 'http://5.78.94.130' 
-USER_API_HASH = os.environ.get('USER_API_HASH') 
-COMMAND_ENDPOINT = '/api/send_gprs_command' 
+API_BASE_URL = 'http://5.78.94.130'
+USER_API_HASH = os.environ.get('USER_API_HASH')
+COMMAND_ENDPOINT = '/api/send_gprs_command'
 DEVICES_ENDPOINT = '/api/get_devices'
 
 # --- CONFIGURACIÓN DE TELEGRAM ---
@@ -154,6 +153,7 @@ HTML_TEMPLATE = """
         </header>
         
         <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
             <div class="bg-gray-800 p-6 rounded-lg">
                 <h2 class="text-2xl font-bold text-red-400 mb-4">BLOQUEAR UNIDADES</h2>
                 <div class="space-y-3">
@@ -162,6 +162,7 @@ HTML_TEMPLATE = """
                     <button onclick="sendCommand('362', 'block_fifth_wheel', this)" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg">Bloquear 5ta Rueda (Prueba)</button>
                 </div>
             </div>
+
             <div class="bg-gray-800 p-6 rounded-lg">
                 <h2 class="text-2xl font-bold text-green-400 mb-4">DESBLOQUEAR UNIDADES</h2>
                 <div class="space-y-3">
@@ -170,8 +171,11 @@ HTML_TEMPLATE = """
                     <button onclick="sendCommand('362', 'unblock_fifth_wheel', this)" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg">Desbloquear 5ta Rueda (Prueba)</button>
                 </div>
             </div>
+
         </main>
+
         <div id="status-message" class="mt-8 text-center text-lg h-6"></div>
+
     </div>
     <footer class="text-center p-4 mt-8">
         <p class="text-sm text-gray-500">Desarrollado por Gerardo De La Torre</p>
@@ -180,7 +184,9 @@ HTML_TEMPLATE = """
     async function sendCommand(deviceId, commandType, buttonElement) {
         const statusDiv = document.getElementById('status-message');
         statusDiv.innerHTML = '<span class="text-blue-400">Enviando comando...</span>';
+        
         document.querySelectorAll('button').forEach(b => b.disabled = true);
+
         try {
             const response = await fetch('/api/send_command', {
                 method: 'POST',
